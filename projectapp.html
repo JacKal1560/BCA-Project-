@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrainTest - Cognitive Screening</title>
+    <!-- Bootstrap CSS and icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { background-color: #f1f5f9; }
+
+        .screen { animation: fadeUp 0.3s ease both; }
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(14px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .word-pill {
+            animation: fadeUp 0.3s ease both;
+        }
+
+        .num-btn {
+            width: 50px;
+            height: 50px;
+            font-weight: 600;
+            font-size: 1rem;
+            padding: 0;
+            flex-shrink: 0;
+        }
+        /* shake animation for wrong clicks */
+        .num-btn.shake {
+            animation: shake 0.4s ease;
+        }
+        @keyframes shake {
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px);  }
+        }
+
+        .timer-ring circle {
+            fill: none;
+            stroke-width: 4;
+            stroke-linecap: round;
+            transform-origin: center;
+            transform: rotate(-90deg); /* start from the top of the circle */
+        }
+
+        .progress-bar { transition: width 0.4s ease; }
+    </style>
+</head>
+<body>
+    <div class="container py-4" style="max-width:580px;">
+        <div class="d-flex align-items-center gap-2 mb-4">
+            <i class="fas fa-brain"></i>
+            <span class="fw-semibold fs-5">BrainTest</span>
+        </div>
+        <div class="progress mb-4" style="height:5px;display:none;" id="progressBar">
+            <div class="progress-bar bg-primary" id="progressFill" role="progressbar" style="width: 0%"></div>
+        </div>
+
+        <!-- Welcome Screen -->
+        <div id="s-welcome" class="card border-0 shadow-sm screen">
+            <div class="card-body p-4">
+                <h1 class="h4 fw-semibold mb-1">BrainTest</h1>
+                <p class="text-muted mb-3" style="font-size:.9rem;">
+                    A short, private screening based on standard cognitive tests. It takes about
+                    8–10 minutes and covers memory, orientation, attention, and spatial reasoning.
+                </p>
+                <div class="alert alert-warning py-2 px-3 mb-3" style="font-size:.83rem;">
+                    <strong>Please note:</strong> This is a personal awareness tool — not a medical diagnosis.
+                </div>
+                <div class="mb-3">
+                    <label class="form-label text-muted small fw-medium" for="userName">
+                        Your first name (optional)
+                    </label>
+                    <input id="userName" type="text" class="form-control form-control-sm" placeholder="e.g. Raju" autocomplete="given-name">
+                </div>
+                <ul class="list-unstyled text-muted mb-3" style="font-size:.86rem; line-height:2;">
+                    <li>📝&nbsp; 4 short tasks</li>
+                    <li>⏱&nbsp; Under 10 minutes</li>
+                    <li>🔒&nbsp; Nothing is saved or shared</li>
+                </ul>
+                <button class="btn btn-primary" onclick="startApp()">Start Test</button>
+            </div>
+        </div>
+        <div id="s-memory" class="card border-0 shadow-sm screen d-none">
+            <div class="card-body p-4">
+                <span class="badge text-bg-primary mb-2" style="font-size:.72rem; letter-spacing:.05em;">
+                    TASK 1 – MEMORY
+                </span>
+                <h2 class="h5 fw-semibold mb-1">Remember these words</h2>
+                <p class="text-muted mb-3" style="font-size:.9rem;">
+                    Study the words below carefully. You'll be asked to recall them next.
+                </p>
+                <hr class="my-3">
+                <!-- Word pills populated by buildMemory() -->
+                <div class="d-flex gap-2 flex-wrap mb-4" id="wordGrid"></div>
+                <!-- Countdown timer -->
+                <div class="d-flex align-items-center gap-3 mt-2">
+                    <svg width="44" height="44" viewBox="0 0 44 44">
+                        <circle cx="22" cy="22" r="18" stroke="#e9ecef" stroke-width="4" fill="none"
+                                style="transform:rotate(-90deg);transform-origin:center;"/>
+                        <circle id="timerRing" cx="22" cy="22" r="18"
+                                stroke="#0d6efd" stroke-width="4" fill="none"
+                                stroke-dasharray="113.1" stroke-dashoffset="0"
+                                style="transform:rotate(-90deg);transform-origin:center;stroke-linecap:round;transition:stroke-dashoffset 0.9s linear,stroke 0.3s;"/>
+                    </svg>
+                    <span class="fs-4 fw-semibold" id="timerNum">20</span>
+                    <span class="text-muted small">seconds remaining</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="s-recall" class="card border-0 shadow-sm screen d-none">
+            <div class="card-body p-4">
+                <span class="badge text-bg-primary mb-2" style="font-size:.72rem; letter-spacing:.05em;">
+                    TASK 1 – MEMORY (RECALL)
+                </span>
+                <h2 class="h5 fw-semibold mb-1">Type the words you remember</h2>
+                <p class="text-muted mb-3" style="font-size:.9rem;">
+                    Enter one word at a time. Press Enter or tap + after each one.
+                </p>
+                <hr class="my-3">
+                <div class="d-flex gap-2 flex-wrap mb-3" id="tagList"></div>
+                <div class="input-group mb-3">
+                    <input id="recallInput" type="text" class="form-control form-control-sm"
+                           placeholder="Type a word…" autocomplete="off" autocorrect="off" spellcheck="false"
+                           onkeydown="if(event.key === 'Enter') addRecallWord()"/>
+                    <button class="btn btn-outline-secondary" onclick="addRecallWord()">+</button>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary btn-sm" onclick="finishRecall()">Continue →</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="finishRecall()">Skip</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task 2 – Orientation -->
+        <div id="s-orientation" class="card border-0 shadow-sm screen d-none">
+            <div class="card-body p-4">
+                <span class="badge text-bg-primary mb-2" style="font-size:.72rem; letter-spacing:.05em;">
+                    TASK 2 – ORIENTATION
+                </span>
+                <h2 class="h5 fw-semibold mb-1">Orientation questions</h2>
+                <p class="text-muted mb-3" style="font-size:.9rem;">
+                    Choose the best answer for each question.
+                </p>
+                <hr class="my-3">
+                <!-- Questions built by buildOrientation() in JS -->
+                <div id="orientationBody"></div>
+                <button class="btn btn-primary btn-sm mt-2" onclick="finishOrientation()">Continue →</button>
+            </div>
+        </div>
+
+        <!-- Task 3 – Number Tap -->
+        <div id="s-attention" class="card border-0 shadow-sm screen d-none">
+            <div class="card-body p-4">
+                <span class="badge text-bg-primary mb-2" style="font-size:.72rem; letter-spacing:.05em;">
+                    TASK 3 – NUMBER TAP
+                </span>
+                <h2 class="h5 fw-semibold mb-1">Tap the numbers in order</h2>
+                <p class="text-muted mb-3" style="font-size:.9rem;">
+                    Find and tap the numbers in order from 1 to 20 as quickly as you can.
+                </p>
+                <hr class="my-3">
+                <!-- Shuffled numbers placed here by buildAttention() -->
+                <div class="d-flex flex-wrap gap-2" id="numGrid"></div>
+                <!-- Status line -->
+                <div class="d-flex gap-4 mt-3 small text-muted">
+                    <span>Next: <strong class="text-primary" id="nextNum">1</strong></span>
+                    <span>Mistakes: <strong class="text-danger" id="mistakeCount">0</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Task 4 – Clock Drawing -->
+        <div id="s-clock" class="card border-0 shadow-sm screen d-none">
+            <div class="card-body p-4">
+                <span class="badge text-bg-primary mb-2" style="font-size:.72rem; letter-spacing:.05em;">
+                    TASK 4 – CLOCK DRAWING
+                </span>
+                <h2 class="h5 fw-semibold mb-1">Draw clock hands for 10:10</h2>
+                <p class="text-muted mb-3" style="font-size:.9rem;">
+                    Tap on the clock face to place each hand. First the hour hand, then the minute hand.
+                </p>
+                <hr class="my-3">
+                <p class="small fw-medium text-primary mb-2" id="clockInstruction">Draw the HOUR hand — tap where 10 would point</p>
+                <!-- Canvas clock face — drawn and interacted with via buildClock() -->
+                <div class="d-flex justify-content-center mb-3">
+                    <canvas id="clockCanvas" width="220" height="220"
+                            style="cursor:crosshair; border-radius:50%; touch-action:none;"></canvas>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button id="clockContinueBtn" class="btn btn-primary btn-sm" style="display:none" onclick="finishClock()">Continue →</button>
+                    <button id="clockUndoBtn" class="btn btn-outline-secondary btn-sm" style="display:none">↩ Redo hour hand</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="finishClock()">Skip</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="s-results" class="card border-0 shadow-sm screen d-none">
+            <div class="card-body p-4">
+                <h2 class="h5 fw-semibold mb-1" id="resultsHeading">Your Results</h2>
+                <p class="text-muted mb-3" style="font-size:.9rem;">
+                    Here's how you did on the four tests.
+                </p>
+                <hr class="my-3">
+                <div class="text-center my-3">
+                    <div class="display-4 fw-semibold text-primary" id="scoreBig">–</div>
+                    <div class="text-muted small">Out of 100</div>
+                    <!-- Risk badge: class swapped by JS based on score -->
+                    <span class="badge mt-2 fs-6" id="riskTag"></span>
+                </div>
+                <div class="mb-3" id="domainList"></div>
+                <hr class="my-3">
+                <!-- Tips list -->
+                <ul class="list-group list-group-flush d-none small" id="tipsList"></ul>
+
+                <!-- Alzheimer's prevention resources — shown for scores below 75 -->
+                <div id="resourcesBox" class="mt-3" style="display:none;">
+                    <hr class="my-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge text-bg-warning" style="font-size:.72rem;">📚 Reading</span>
+                        <span class="fw-medium small">Alzheimer's Prevention Resources</span>
+                    </div>
+                    <p class="text-muted mb-2" style="font-size:.8rem;">
+                        Trusted articles on lifestyle changes that may help reduce cognitive decline risk.
+                    </p>
+                    <div class="list-group list-group-flush" id="resourcesList"></div>
+                </div>
+
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button class="btn btn-primary btn-sm" onclick="restartApp()">Take Again</button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="window.print()">Print / Save</button>
+                </div>
+                <p class="text-muted mt-3" style="font-size:.78rem;">
+                    This is a screening tool only. Contact your doctor for actual medical advice.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
